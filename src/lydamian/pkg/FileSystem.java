@@ -90,4 +90,15 @@ public class FileSystem {
 		return -1;
 	}
 	
+	//Inner Class
+	public class FileDescriptor{
+		int fileLength;
+		int[] blockNumbers;
+		
+		FileDescriptor(int fileLength, int blockLengthMax){
+			this.fileLength = fileLength;
+			this.blockNumbers = new int[blockLengthMax];
+		}
+	}
+	
 }
