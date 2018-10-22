@@ -27,8 +27,24 @@ public class Driver {
 			destroying an open file is ok (not an error)
 			every open command must use the first available slot in the OFT (smallest index)
 		 */
-		IOSystem iosystemObj = new IOSystem(4,3);
-		iosystemObj.testIOSystem();
+		
+		// local variables
+		int l = 64; //64 blocks
+		int b = 64; //64 bytes per block;
+		int bitmapLength = 8; //64 bytes reserved for bitmap but only 8 bytes needed.
+		int k; // reserved memory location.
+		
+		
+		//Initialize Ldisk
+		IOSystem ldisk = new IOSystem(64,64);
+		ldisk.testIOSystem();
+		char[] main_memory =  {'h','e','l','l','o'};
+		ldisk.write_block(1, main_memory);
+		ldisk.displayData(1);
+		
+
+		
+		
 
 	}
 

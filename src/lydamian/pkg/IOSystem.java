@@ -32,10 +32,10 @@ public class IOSystem {
 	// starting at the location specified by the pointer p.
 	// The number of characters copied corresponding to to
 	// the block length, B
-	public int read_block(int i, byte &p) {
+	public int read_block(int i, char[] p) {
 		int char_copied = 0;
 		for(int index = 0; index < this.b; index++) {
-			p = this.ldisk[i][index];
+			p[index] = (char)this.ldisk[i][index];
 			char_copied++;
 		}
 		return char_copied;
@@ -44,8 +44,13 @@ public class IOSystem {
 	//This copies the number of character corresponding to the block
 	// length, B, from main memory starting at the location specified
 	// by the pointer p, into the logical block ldisk[i]
-	public int write_block(int i, char p) {
+	public int write_block(int i, char[] p) {
 		int char_copied = 0;
+		for(int index = 0; index < p.length; index++) {
+			this.ldisk[i][index] = (byte)p[index];
+			char_copied++;
+		}
+		return char_copied;
 	}
 	
 	public int saveLDisk() {
@@ -54,6 +59,14 @@ public class IOSystem {
 	
 	public int restoreLDisk() {
 		return 1;
+	}
+	
+	// This method displays the values stored at ldisk[i]
+	//Input: (int) i - row of data located at ldisk
+	public void displayData(int i) {
+		for(int index = 0; index < b; index++) {
+			System.out.println((char)this.ldisk[i][index]); 
+		}
 	}
 	
 }
