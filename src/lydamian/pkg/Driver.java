@@ -42,6 +42,9 @@ public class Driver {
 		ldisk.write_block(1, main_memory);
 		ldisk.displayData(1);
 		
+		//Initializing FileSystem.java
+		FileSystem fileSystem = new FileSystem(64, 24, 3);
+		
 
 		
 		

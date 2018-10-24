@@ -4,22 +4,22 @@ package lydamian.pkg;
 public class FileSystem {
 	//data members
 	
-	int k; //reserved memory space
-	int bitmapLength;//bitmaplength
+	int k; //reserved memory space in bytes
+	int bitmapLength;//bitmaplength in bytes
 	int numDescriptors; //number of file descriptors
-	int fileBlockLength;
+	int fileBlockLength; //in blocks
 	
 	
 	
 	//constructors
-	FileSystem(int k, int bitmapLength, int numDescriptors,
+	FileSystem(int bitmapLength, int numDescriptors,
 			int fileBlockLength){
-		this.k = k;
-		this.bitmapLength = bitmapLength;
-		this.numDescriptors = numDescriptors;
-		
 
-		
+		this.bitmapLength = bitmapLength; 
+		this.numDescriptors = numDescriptors; //in bytes
+		int k = bitmapLength + numDescriptors*4*4; // in bytes
+		this.k = k;
+		this.fileBlockLength = fileBlockLength;
 	}
 	
 	//class methods
@@ -27,12 +27,37 @@ public class FileSystem {
 	// create a new file with the specified name
 	public int create(String[] symbolic_file_name) {
 		System.out.println("create function called..\n");
+		
+		//find a free file descriptor
+		for(int i = this.bitmapLength; i < k; i++ ) {
+		}
+		
+		// Find a free entry in the directory ( this is done by rewinding
+		// the directory and reading it until a free slot is found; recall
+		// that the directory is treated just like any other file. At
+		// the same time, verify that the file does not already exists.
+		// If it does, return a status error.
+		
+		//enter the symbolic name and the descriptor index into the found
+		//directory entry
+		
+		//return status
 		return -1;
 	}
 	
 	//destroy the named file.
 	public int destroy(String[] symbolic_file_name) {
 		System.out.println("destroy function called..\n");
+		
+		//Find the file descriptor by searching the directory
+		
+		//Remove the directory entry
+		
+		//Update the bitmap to reflect the freed blocks
+		
+		//Free the file descriptor
+		
+		//Return status
 		return -1;
 	}
 	
@@ -42,11 +67,28 @@ public class FileSystem {
 	// lseek, or close operations.
 	public int open(String[] symbolic_file_name) {
 		System.out.println("open function called..\n");
+		
+		//Search the directory to find the index of the file descriptor
+		
+		//Allocate a free OFT entry(if possible)
+		
+		//Fill in the current position (zero) and the file descriptor index
+		
+		//Read the first block of the file into the buffer (read-ahead)
+		
+		//Return the OFT index (or error status)
 		return -1;
 	}
 	
 	// close the specified file
 	public int close(int index) {
+		//Write the buffer to disk
+		
+		//Update the file length in descriptor
+		
+		//Free the OFT entry
+		
+		//Return status
 		return -1;
 	}
 	
@@ -87,6 +129,13 @@ public class FileSystem {
 	// list the names of all files and their lengths
 	public int directory() {
 		System.out.println("directory method called.\n");
+		
+		//Read the directory file
+		
+		//For each entry, 
+		// - find file descriptor
+		// - print file name and file length
+		
 		return -1;
 	}
 	
