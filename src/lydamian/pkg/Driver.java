@@ -38,13 +38,23 @@ public class Driver {
 		//Initialize Ldisk
 		IOSystem ldisk = new IOSystem(64,64);
 		ldisk.testIOSystem();
-		char[] main_memory =  {'h','e','l','l','o'};
-		ldisk.write_block(1, main_memory);
-		ldisk.displayData(1);
 		
 		//Initializing FileSystem.java
-		FileSystem fileSystem = new FileSystem(64, 24, 3);
+		FileSystem fileSystem = new FileSystem(64, 24, 3, ldisk, l, b);
 		
+		//Test create/destroy
+		fileSystem.create("f0");
+		ldisk.displayData(7);
+		fileSystem.destroy("fo");
+		ldisk.displayData(7);
+		
+		//Test OFT
+		
+		//Test Reading Writing Seeking
+		
+		//Test Directory
+		
+		//Implement Shell.
 
 		
 		

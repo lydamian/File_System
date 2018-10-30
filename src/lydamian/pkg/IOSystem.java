@@ -14,6 +14,13 @@ public class IOSystem {
 		this.l = l;
 		this.b = b;
 		this.ldisk = new byte[l][b];
+		
+		for(int i = 0; i <l; i++) {
+			for(int j = 0; j < b; j++) {
+				this.ldisk[i][j] = -1; // -1 means an empty area.
+			}
+		}
+		
 	}
 	
 	public IOSystem(){
@@ -41,10 +48,28 @@ public class IOSystem {
 		return char_copied;
 	}
 	
+	public int read_block(int i, byte[] p) {
+		int char_copied = 0;
+		for(int index = 0; index < this.b; index++) {
+			p[index] = this.ldisk[i][index];
+			char_copied++;
+		}
+		return char_copied;
+	}
+	
 	//This copies the number of character corresponding to the block
 	// length, B, from main memory starting at the location specified
 	// by the pointer p, into the logical block ldisk[i]
 	public int write_block(int i, char[] p) {
+		int char_copied = 0;
+		for(int index = 0; index < p.length; index++) {
+			this.ldisk[i][index] = (byte)p[index];
+			char_copied++;
+		}
+		return char_copied;
+	}
+	
+	public int write_block(int i, byte[] p) {
 		int char_copied = 0;
 		for(int index = 0; index < p.length; index++) {
 			this.ldisk[i][index] = (byte)p[index];

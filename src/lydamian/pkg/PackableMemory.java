@@ -19,7 +19,7 @@ class PackableMemory
   }
 
   // Pack the 4-byte integer val into the four bytes mem[loc]...mem[loc+3].
-  // The most significant porion of the integer is stored in mem[loc].
+  // The most significant portion of the integer is stored in mem[loc].
   // Bytes are masked out of the integer and stored in the array, working
   // from right(least significant) to left (most significant).
   void pack(int val, int loc)
