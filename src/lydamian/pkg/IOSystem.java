@@ -90,7 +90,7 @@ public class IOSystem {
 	//Input: (int) i - row of data located at ldisk
 	public void displayData(int i) {
 		for(int index = 0; index < b; index++) {
-			System.out.println((char)this.ldisk[i][index]); 
+			System.out.println(this.ldisk[i][index]); 
 		}
 	}
 	

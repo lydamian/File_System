@@ -45,10 +45,18 @@ public class Driver {
 		//Test create/destroy
 		fileSystem.create("f0");
 		ldisk.displayData(7);
-		fileSystem.destroy("fo");
+		fileSystem.destroy("f0");
+		ldisk.displayData(7);
+		System.out.println("displaying block1");
+		ldisk.displayData(1);
+		fileSystem.create("foo1");
 		ldisk.displayData(7);
 		
 		//Test OFT
+		int oftIndex = fileSystem.open("foo1");
+		fileSystem.oft.displayOFT();
+		//fileSystem.close(oftIndex);
+		//fileSystem.oft.displayOFT();
 		
 		//Test Reading Writing Seeking
 		

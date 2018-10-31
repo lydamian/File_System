@@ -15,6 +15,8 @@ public class FileSystem {
 	int l;
 	int b;
 	
+	OFT oft;
+	
 	IOSystem ldiskObj;
 	static PackableMemory packMem = new PackableMemory(4);
 	
@@ -29,6 +31,7 @@ public class FileSystem {
 		this.ldiskObj = ldiskRef;
 		this.l = l;
 		this.b = b;
+		oft = new OFT(4);
 	}
 	
 	//class methods
@@ -52,7 +55,7 @@ public class FileSystem {
 	}
 	
 	//converts an integer to a byte array
-	byte[] toBytes(int i)
+	protected byte[] toBytes(int i)
 	{
 	  byte[] result = new byte[4];
 
@@ -64,17 +67,97 @@ public class FileSystem {
 	  return result;
 	}
 	
+	int fromByteArray(byte[] bytes) {
+	     return ByteBuffer.wrap(bytes).getInt();
+	}
+	
+	//this method checks whether the corresponding file name exists or not
+	// if it does exists return the corresponding fileDescriptorIndex, else -1
+	protected int doesFileExist(String symbolicFileName) {
+		//local variables
+				char[] dir = new char[this.b];
+				int freeDirI = 0;
+				int freeDirJ = 0;
+				int fdIndex = -1;
+				byte[] tempByte = new byte[4];
+				
+				//Find the file descriptor by searching the directory
+				outerloop: for(int i = this.k/64; i < (this.k/64)+this.fileBlockLength; i++) {
+					ldiskObj.read_block(i, dir); // THERE IS AN ERROR HEREE!
+						//check if theres a free directory space
+						for(int j = 0; j < this.b; j = j+8) {
+							byte[] tempSymbolicName = new byte[4];
+							tempSymbolicName[0] = (byte)dir[j];
+							tempSymbolicName[1] = (byte)dir[j+1];
+							tempSymbolicName[2] = (byte)dir[j+2];
+							tempSymbolicName[3] = (byte)dir[j+3];
+							
+							if(isMatchSymbolicName(symbolicFileName, tempSymbolicName)) {
+								int index = 0;
+								for(int a = j+4; a < 8; a++) {
+									tempByte[index] = (byte)dir[a];
+									index++;
+								}
+								fdIndex = java.nio.ByteBuffer.wrap(tempByte).getInt();
+								System.out.println("fdIndex is: " + fdIndex);
+								freeDirI = i;
+								freeDirJ = j;
+								break outerloop;
+							}
+						}
+				}
+				
+				if(fdIndex == -1) {
+					System.out.println("Could not find a file that matches symbolic_name");
+					return -1;
+				}
+				return fdIndex;
+	}
+	
+	
 	// This method sets the corresponding block in the bitmap
 	// to the value specified by the argument value.
-	int modifyBitmap(int block, int value) {
+	protected int modifyBitmap(int block, int value) {
 		return 1;
 	}
 	
+	//getCorrespondingBlocks where fileIndex reside
+	protected int[] fileIndexToBlock(int fileIndex) {
+		int fdBlock = 1 + (fileIndex*16/this.b);
+		int fdBlockIndex = fileIndex*16%this.b;
+		byte[] tempArr = new byte[this.b];
+		int[] blockPointers = new int[3];
+		
+		int j = 0;
+		for(int i = fdBlockIndex+4; i < fdBlockIndex + 16; i = i+4) {
+			ldiskObj.read_block(fdBlock, tempArr);
+			if(Arrays.copyOfRange(tempArr, i, i + 4)[0] != -1) {
+				blockPointers[j] = fromByteArray(Arrays.copyOfRange(tempArr, i, i + 4));
+			}
+			else {
+				blockPointers[j] = -1;
+			}
+			j++;
+		}
+		return blockPointers;
+		
+	}
+	
+	//This method finds the file descriptors from a directory given a symbolic name
+	protected int findFileDescriptorIndex(String symbolicName) {
+		return 1; 
+	}
 	
 	// create a new file with the specified name
 	public int create(String symbolic_file_name) {
 		System.out.println("create function called..\n");
 		
+		//checking if file exists
+		if(this.doesFileExist(symbolic_file_name) != -1) {
+			System.out.println("Error, file already exists...");
+			return -1;
+		}		
+
 		//local variables
 		int fdBlockIndex = this.bitmapLength/this.b;
 		int start = bitmapLength/64; //since we skip 0 for directory
@@ -88,13 +171,18 @@ public class FileSystem {
 		for(int i = start; i <= k/64; i++ ) {
 			ldiskObj.read_block(i, fileDescriptorBlock);
 			
-			for(int j = 0; i < this.b; j = j+16) {
+			for(int j = 0; j < this.b; j = j+16) {
 				if((byte)fileDescriptorBlock[j] < 0) {
 					freeFdI = i;
 					freeFdJ = j;
 					break outerloop;
 				}
 			}
+		}
+		
+		//set fileDescriptor file length to 0
+		for(int i = freeFdJ; i < freeFdJ + 4; i++){
+			fileDescriptorBlock[i] =  0;
 		}
 		
 		System.out.println("freeFdI is: " + freeFdI);
@@ -105,6 +193,7 @@ public class FileSystem {
 		// that the directory is treated just like any other file. At
 		// the same time, verify that the file does not already exists.
 		// If it does, return a status error
+		
 		char[] tempBlock =  new char[64];
 		ldiskObj.read_block(k/64, tempBlock);
 		char[] dir = new char[this.b];
@@ -129,8 +218,7 @@ public class FileSystem {
 
 		//enter the symbolic name and the descriptor index into the found
 		//directory entry
-		byte[] symbolic_name = {0,0,0,0};
-		symbolic_name = symbolic_file_name.getBytes();
+		byte[] symbolic_name = symbolic_file_name.getBytes();
 		int j = 0;
 		for(int i = freeDirJ; i < (freeDirJ + symbolic_file_name.length()); i++) {
 			dir[i] = (char)symbolic_name[j];
@@ -160,13 +248,28 @@ public class FileSystem {
 		//return status
 		return 1;
 	}
-	
+
 	//Method checks whether a symbolic name matches a character array.
 	boolean isMatchSymbolicName(String symbolic_name, byte[] p) {
-		byte[] buf = new byte[4];
-		buf = symbolic_name.getBytes();
-		if(buf[0] == p[0] && buf[1] == p[1] && buf[2] == p[2] && buf[3] == p[3]) {
-			return true;
+		
+		int count = 0;
+		for(int i = 0; i < 4; i++) {
+			if(p[i] > -1) {
+				count++;
+			}
+		}
+		byte[] buf = new byte[count];
+		
+		for(int i = 0; i < 4; i++) {
+			if(p[i] > -1) {
+				buf[i] = p[i];
+			}
+		}
+		
+		if (Arrays.equals(buf, symbolic_name.getBytes()))
+		{
+		    System.out.println("Yup, they're the same!");
+		    return true;
 		}
 		return false;
 	}
@@ -180,11 +283,10 @@ public class FileSystem {
 		int freeDirJ = 0;
 		int fdIndex = -1;
 		byte[] tempByte = new byte[4];
-		ByteBuffer buf = ByteBuffer.allocate(4);
 		
 		//Find the file descriptor by searching the directory
-		for(int i = this.k; i < this.k+this.fileBlockLength; i++) {
-			ldiskObj.read_block(i, dir);
+		outerloop: for(int i = this.k/64; i < (this.k/64)+this.fileBlockLength; i++) {
+			ldiskObj.read_block(i, dir); // THERE IS AN ERROR HEREE!
 				//check if theres a free directory space
 				for(int j = 0; j < this.b; j = j+8) {
 					byte[] tempSymbolicName = new byte[4];
@@ -195,7 +297,7 @@ public class FileSystem {
 					
 					if(isMatchSymbolicName(symbolic_file_name, tempSymbolicName)) {
 						int index = 0;
-						for(int a = j+4; j < 8; a++) {
+						for(int a = j+4; a < 8; a++) {
 							tempByte[index] = (byte)dir[a];
 							index++;
 						}
@@ -204,9 +306,14 @@ public class FileSystem {
 						freeDirI = i;
 						freeDirJ = j;
 						System.out.println(symbolic_file_name + " matches with " + tempSymbolicName);
-						break;
+						break outerloop;
 					}
 				}
+		}
+		
+		if(fdIndex == -1) {
+			System.out.println("Could not find a file that matches symbolic_name");
+			return -1;
 		}
 		
 		//Remove the directory entry (set corresponding bytes to -1)
@@ -216,17 +323,18 @@ public class FileSystem {
 		ldiskObj.write_block(freeDirI,dir);
 		
 		//Update the bitmap to reflect the freed blocks ( set to 0 )
+		// - get the blocks that the file descriptor pointed to.
+		// - read in the bitmap and set each bit corresponding to block to 0;
 		char[] bitmap = new char[64]; 
 		ldiskObj.read_block(0, bitmap);
 		
-		
 		//Free the file descriptor
-		int fdBlock = fdIndex*16/this.b;
+		int fdBlock = bitmapLength/64 + fdIndex*16/this.b;
 		int fdBlockIndex = fdIndex*16%this.b;
-		char[] tempArr = new char[this.b];
+		byte[] tempArr = new byte[this.b];
 		ldiskObj.read_block(fdBlock, tempArr);
 		for(int i = fdBlockIndex; i < fdBlockIndex + 16; i++) {
-			tempArr[i] = (char)-1;
+			tempArr[i] = -1;
 		}
 		ldiskObj.write_block(fdBlock, tempArr);
 		//Return status
@@ -237,41 +345,120 @@ public class FileSystem {
 	// open the named file for reading and writing; return an
 	// index value which is used by subsequent read, write, 
 	// lseek, or close operations.
-	public int open(String[] symbolic_file_name) {
+	public int open(String symbolic_file_name) {
 		System.out.println("open function called..\n");
+		//local variables
+		int freeTableIndex = 0;
 		
-		//Search the directory to find the index of the file descriptor
+		//Search the directory to find  the index of the file descriptor
+		char[] dir = new char[this.b];
+		int freeDirI = 0;
+		int freeDirJ = 0;
+		int fdIndex = -1;
+		byte[] tempByte = new byte[4];
+		int tempBlockIndex;
+		
+		//Find the file descriptor by searching the directory
+		outerloop: for(int i = this.k/64; i < (this.k/64)+this.fileBlockLength; i++) {
+			ldiskObj.read_block(i, dir); // THERE IS AN ERROR HEREE!
+				//check if theres a free directory space
+				for(int j = 0; j < this.b; j = j+8) {
+					byte[] tempSymbolicName = new byte[4];
+					tempSymbolicName[0] = (byte)dir[j];
+					tempSymbolicName[1] = (byte)dir[j+1];
+					tempSymbolicName[2] = (byte)dir[j+2];
+					tempSymbolicName[3] = (byte)dir[j+3];
+					
+					if(isMatchSymbolicName(symbolic_file_name, tempSymbolicName)) {
+						int index = 0;
+						for(int a = j+4; a < 8; a++) {
+							tempByte[index] = (byte)dir[a];
+							index++;
+						}
+						fdIndex = java.nio.ByteBuffer.wrap(tempByte).getInt();
+						System.out.println("fdIndex is: " + fdIndex);
+						freeDirI = i;
+						freeDirJ = j;
+						System.out.println(symbolic_file_name + " matches with " + tempSymbolicName);
+						break outerloop;
+					}
+				}
+		}
+		
+		if(fdIndex == -1) {
+			System.out.println("Could not find a file that matches symbolic_name");
+			return -1;
+		}
 		
 		//Allocate a free OFT entry(if possible)
+		if(this.oft.availableSpace <= 0) {
+			System.out.println("ERROR, Too many files open, please close a file...\n");
+			return -1;
+		}
+		else {
+			freeTableIndex = this.oft.maxLength - this.oft.availableSpace;
+			this.oft.availableSpace--;
+		}
 		
 		//Fill in the current position (zero) and the file descriptor index
+		this.oft.openFileArray[freeTableIndex].fileDescriptorIndex = fdIndex;
+		this.oft.openFileArray[freeTableIndex].position = 0;
 		
 		//Read the first block of the file into the buffer (read-ahead)
+		int[] getBlocks = this.fileIndexToBlock(fdIndex);
+		if(getBlocks[0] > 0) {
+			ldiskObj.read_block(getBlocks[0], this.oft.openFileArray[freeTableIndex].rwbuffer);
+		}
 		
 		//Return the OFT index (or error status)
-		return -1;
+		return freeTableIndex;
 	}
 	
 	// close the specified file
 	public int close(int index) {
-		//Write the buffer to disk
+		//local variables
+		int ldiskBlockIndex;
 		
+		//Write the buffer to disk
+		ldiskBlockIndex = fileIndexToBlock(index)[0];
+		ldiskObj.write_block(ldiskBlockIndex, this.oft.openFileArray[index].rwbuffer); 
 		//Update the file length in descriptor
 		
 		//Free the OFT entry
+		this.oft.openFileArray[index].position = 0;
+		this.oft.openFileArray[index].fileDescriptorIndex = -1;
+		for(int i = 0; i < this.b; i++) {
+			this.oft.openFileArray[index].rwbuffer[i] = 0;
+		}
 		
 		//Return status
-		return -1;
+		return 1;
 	}
 	
 	// sequentially read a number of bytes from the specified
-	// file into main meory. The number of bytes to be read is
-	// specified in count and the starting memory adress
+	// file into main memory. The number of bytes to be read is
+	// specified in count and the starting memory address
 	// in mem_area. The reading starts with the current position
 	// in the file.
 	public int read(int index, byte[] mem_area, int count) {
 		System.out.println("read function called..\n");
-		return -1;
+		//local variables
+		
+		//computer the position within the read/write buffer that
+		// corresponds to the current position within (i.e file length
+		// modulo buffer length)
+		
+		//Start copying bytes from the buffer into the specified main
+		//memory location until one of the following happens:
+		
+		//a) The desired count or the end of the file is reached; in this
+		// case, update the current position and return status.
+		
+		//b) read the next sequential block from the disk into the buffer;
+		//continue with step 2)
+		
+		
+		return 1;
 	}
 	
 	// sequentially write a number of bytes from main memory starting
@@ -280,8 +467,22 @@ public class FileSystem {
 	// the current position in the file.
 	public int write(int index, byte[] mem_area, int count) {
 		System.out.println("write function called..\n");
-		return -1;
+		
+		//transfer data specified in mem_area to index in OFT 
+		// until
+		
+		//a) desired byte count is satisfied or the end of the buffer
+		// is reached.
+		
+		//b) Else, the buffer is written to disk, the file descriptor
+		// and the bitmap are then updated to reflect the new block 
+		// and the writing continues at the beggining of the buffer.
+		// If file length expands past the last allocated block,
+		// a new block must be allocated;
+		return 1;
+		
 	}
+	
 	
 	/*
 	 * Move the current position of the file to pos, where pos is an
@@ -315,14 +516,30 @@ public class FileSystem {
 	public class OFT{
 		// CLASS VARIABLES
 		OpenFile[] openFileArray;
+		int maxLength;
+		int availableSpace;
 		
 		// CLASS CONSTRUCTORS
 		OFT(int numElems){
 			openFileArray = new OpenFile[numElems];
-			
+			this.maxLength = numElems;
+			this.availableSpace = 3; // allocate first element for directory
+			for(int i = 0; i < numElems; i++) {
+				openFileArray[i] = new OpenFile();
+			}
 		}
 		
 		// CLASS METHODS
+		void displayOFT() {
+			for(int i = 0; i < maxLength; i++) {
+				System.out.println("Buffer: ");
+				for(int j = 0; j < 64; j++) {
+					System.out.print(this.openFileArray[i].rwbuffer[j] + " ");
+				}
+				System.out.println("positions: \n" + openFileArray[i].position);
+				System.out.println("file Descriptor Index: \n" + this.openFileArray[i].fileDescriptorIndex);
+			}
+		}
 		
 		public class OpenFile{
 			byte[] rwbuffer;
@@ -331,8 +548,8 @@ public class FileSystem {
 			
 			OpenFile(){
 				this.rwbuffer = new byte[64];
+				this.fileDescriptorIndex = -1 ;
 				this.position = 0;
-				this.fileDescriptorIndex = 0;
 			}
 		}
 	}
