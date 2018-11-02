@@ -12,6 +12,9 @@ public class FileSystem {
 	int numDescriptors; //number of file descriptors
 	int fileBlockLength; //in blocks
 	
+	int[] BM;
+	int[] MASK;
+	
 	int l;
 	int b;
 	
@@ -32,6 +35,18 @@ public class FileSystem {
 		this.l = l;
 		this.b = b;
 		oft = new OFT(4);
+		
+		BM = new int[this.b/32]; //intially set all values in the bitmap to 0 except first 7 blocks
+		MASK = new int[32]; //initialize MASK.
+		
+		//initializing mask
+		for (int n = 31; n >= 0; n++) {
+		   MASK[n] = 1 << n;
+		}
+		
+		for(int i = 0; i < 10; i++) { //set the first 10 blocks as allocated
+			BM[i] = BM[i] | MASK[i];
+		}
 	}
 	
 	//class methods
@@ -70,6 +85,48 @@ public class FileSystem {
 	int fromByteArray(byte[] bytes) {
 	     return ByteBuffer.wrap(bytes).getInt();
 	}
+	
+	// This method finds the max length a specified file from a fdIndex
+	protected int getFileMaxLength(int fileIndex) {
+		//local variables
+		int maxLength = 0;
+		byte[] byteArr = new byte[4];
+		byte[] tempArr = new byte[this.b];
+		
+		//finding the max length
+		int fdBlock = 1 + (fileIndex*16/this.b);
+		int fdBlockIndex = fileIndex*16%this.b;
+		
+		for(int i = fdBlockIndex; i < fdBlockIndex + 4; i = i+4) {
+			ldiskObj.read_block(fdBlock, tempArr);
+				maxLength += fromByteArray(Arrays.copyOfRange(tempArr, i, i + 4));
+		}
+		
+		System.out.println("the maxLength is: " + maxLength);
+		return maxLength;
+	}
+	
+	//this method returns the available space in the block
+	protected int availableSpaceInBlock(int block){
+		if(block == -1) {
+			System.out.println("Error in finding the available space in a block");
+			return -1;
+		}
+		
+		int availableSpace = 0;
+		byte[] blockArr = new byte[this.b];
+		this.ldiskObj.read_block(block, blockArr);
+		
+		for(int i = 0; i < this.b; i++) {
+			if(blockArr[i] == -1) {
+				availableSpace = this.b - i;
+				break;
+			}
+		}
+		
+		return availableSpace;
+	}
+	
 	
 	//this method checks whether the corresponding file name exists or not
 	// if it does exists return the corresponding fileDescriptorIndex, else -1
@@ -114,11 +171,144 @@ public class FileSystem {
 				return fdIndex;
 	}
 	
+	//Method checks whether a symbolic name matches a character array.
+	boolean isMatchSymbolicName(String symbolic_name, byte[] p) {
+		
+		int count = 0;
+		for(int i = 0; i < 4; i++) {
+			if(p[i] > -1) {
+				count++;
+			}
+		}
+		byte[] buf = new byte[count];
+		
+		for(int i = 0; i < 4; i++) {
+			if(p[i] > -1) {
+				buf[i] = p[i];
+			}
+		}
+		
+		if (Arrays.equals(buf, symbolic_name.getBytes()))
+		{
+		    System.out.println("Yup, they're the same!");
+		    return true;
+		}
+		return false;
+	}
+	
+	//This method finds the number of blocks allocated for a file
+	protected int findBlocksAllocated(int fdIndex) {
+		
+	}
+	
+	//This method allocates a new block for a corresponding fdIndex
+	 protected int allocateNewBlock(int fdIndex) {
+		 //local variables
+		 int newBlock;
+		 int fdBlock;
+		 int fdBlockIndex;
+	
+		 if((newBlock = findAvailableBlock()) == -1){
+			 System.out.println("No more free blocks");
+			 return -1;
+		 }
+		 
+		 //check if this file descriptor has reached its maximum number of blocks allocated
+		 if(findBlocksAllocated(fdIndex) > 2) {
+			 System.out.println("Max number of blocks allocated for this file descriptor");
+			 return -1;
+		 }
+		 
+		 //allocate a new block
+		 // - read in ldisk for filedescriptor
+		 // - update filedescriptor
+		 // - write file descriptor back.
+		 newBlock = findAvailableBlock();
+		 
+		 
+		 return 1;
+	 }
 	
 	// This method sets the corresponding block in the bitmap
 	// to the value specified by the argument value.
-	protected int modifyBitmap(int block, int value) {
+	protected int setBitmap(int block, int value) {
+		if(block > 64 ||  value > 1 || value < 0) {
+			System.out.println("Error Parameters out of range in method setBitmap");
+			return -1;
+		}
+		
+		if(block > 31) {
+			if(value == 0) {
+				BM[1] = BM[1] & ~MASK[block];
+			}
+			else {
+				BM[1] = BM[1] | MASK[block];
+			}
+		}
+		else {
+			if(value == 0) {
+				BM[2] = BM[2] & ~MASK[block];
+			}
+			else {
+				BM[2] = BM[2] | MASK[block];
+			}
+		}
 		return 1;
+	}
+	
+	//this method gets the bitmap value at a specified block mapping.
+	protected int getBitmapValue(int block) {
+		return 1;
+	}
+	
+	//this method writes the current bitmap cached in a datastructure to ldisk.
+	protected void writeBitmap() {
+		
+	}
+	
+	//Finds to the next available block by searching through the bitmap
+	int findAvailableBlock() {
+		int test;
+		
+		for(int i = 0; i < 2; i++) {
+			for(int j = 0; j < 32; i++) {
+				test = BM[i] & MASK[j];
+				if(test == 0) {
+					
+					return (i+1)*j;
+				}
+			}
+		}
+		
+		return -1; // no blocks are available! ahhh
+	}
+	
+	//This method returns the appropriate block index corresponding
+	// to the given file index and file block index
+	protected int getAppropriateBlock(int fdIndex, int curr_file_index){
+		//local variables
+		byte[] tempBlock = new byte[this.b];
+		int appropiateBlock;
+		byte[] byteInt = new byte[4];
+		
+		int fdBlock = 1 + ((fdIndex * 16)/this.b);
+		int fdBlockIndex = (fdIndex * 16)%this.b;
+		
+		this.ldiskObj.read_block(fdBlock, tempBlock);
+		
+		int start = fdBlockIndex + 4 + curr_file_index*4;
+		
+		int j = 0;
+		for(int i = start; i < start + 4; i++) {
+			if(tempBlock[i] == -1) {
+				System.out.println("Error, block requested to read is empty...");
+				return -1;
+			}
+			byteInt[j] = tempBlock[i];
+			j++;
+		}
+		
+		return fromByteArray(byteInt);
 	}
 	
 	//getCorrespondingBlocks where fileIndex reside
@@ -248,31 +438,6 @@ public class FileSystem {
 		//return status
 		return 1;
 	}
-
-	//Method checks whether a symbolic name matches a character array.
-	boolean isMatchSymbolicName(String symbolic_name, byte[] p) {
-		
-		int count = 0;
-		for(int i = 0; i < 4; i++) {
-			if(p[i] > -1) {
-				count++;
-			}
-		}
-		byte[] buf = new byte[count];
-		
-		for(int i = 0; i < 4; i++) {
-			if(p[i] > -1) {
-				buf[i] = p[i];
-			}
-		}
-		
-		if (Arrays.equals(buf, symbolic_name.getBytes()))
-		{
-		    System.out.println("Yup, they're the same!");
-		    return true;
-		}
-		return false;
-	}
 	
 	//destroy the named file.
 	public int destroy(String symbolic_file_name) {
@@ -322,12 +487,6 @@ public class FileSystem {
 		}
 		ldiskObj.write_block(freeDirI,dir);
 		
-		//Update the bitmap to reflect the freed blocks ( set to 0 )
-		// - get the blocks that the file descriptor pointed to.
-		// - read in the bitmap and set each bit corresponding to block to 0;
-		char[] bitmap = new char[64]; 
-		ldiskObj.read_block(0, bitmap);
-		
 		//Free the file descriptor
 		int fdBlock = bitmapLength/64 + fdIndex*16/this.b;
 		int fdBlockIndex = fdIndex*16%this.b;
@@ -337,6 +496,16 @@ public class FileSystem {
 			tempArr[i] = -1;
 		}
 		ldiskObj.write_block(fdBlock, tempArr);
+		
+		//Update the bitmap to reflect the freed blocks ( set to 0 )
+		// - get the blocks that the file descriptor pointed to.
+		int[] freedBlocks = fileIndexToBlock(fdIndex);
+		for(int i = 0; i < freedBlocks.length; i++) {
+			if(freedBlocks[i] > 0) {
+				setBitmap(freedBlocks[i], 0);
+			}
+		}
+		
 		//Return status
 		return 1;
 	}
@@ -421,7 +590,8 @@ public class FileSystem {
 		
 		//Write the buffer to disk
 		ldiskBlockIndex = fileIndexToBlock(index)[0];
-		ldiskObj.write_block(ldiskBlockIndex, this.oft.openFileArray[index].rwbuffer); 
+		ldiskObj.write_block(ldiskBlockIndex, this.oft.openFileArray[index].rwbuffer);
+		 
 		//Update the file length in descriptor
 		
 		//Free the OFT entry
@@ -443,20 +613,50 @@ public class FileSystem {
 	public int read(int index, byte[] mem_area, int count) {
 		System.out.println("read function called..\n");
 		//local variables
+		int position;
+		int numCounted = 0;
+		int fdIndex = this.oft.openFileArray[index].fileDescriptorIndex;
+		int maxLengthOfFile = getFileMaxLength(fdIndex);
+		int j = 0;
+		int curr_file_index = this.oft.openFileArray[index].position/this.b;
 		
-		//computer the position within the read/write buffer that
-		// corresponds to the current position within (i.e file length
+		//compute the position within the read/write buffer that
+		// corresponds to the current position within the file (i.e file length
 		// modulo buffer length)
+		position = this.oft.openFileArray[index].position; //reading from the current position in the file
+		
+		if(maxLengthOfFile >= 64*3) {
+			System.out.println("wtf something is broken, maxLengthOfFile exceeds max");
+			return -1;
+		}
 		
 		//Start copying bytes from the buffer into the specified main
 		//memory location until one of the following happens:
+		for(int i = this.oft.openFileArray[index].position%this.b;
+				numCounted < count || position < maxLengthOfFile;
+				i++, numCounted++, position++, j++) {
+			if(position/this.b >= 1) { //end of buffer is reached
+				   
+				//write the buffer into the appropriate block on disk (if modified)
+				int appropriate_block = getAppropriateBlock(fdIndex,curr_file_index);
+				ldiskObj.write_block(appropriate_block,this.oft.openFileArray[index].rwbuffer);
+				
+				//read the next sequential block from the disk into the buffer
+				appropriate_block = getAppropriateBlock(fdIndex, curr_file_index + 1);
+				this.ldiskObj.read_block(appropriate_block,this.oft.openFileArray[index].rwbuffer);
+				
+				i = 0;
+				//continue with step 2
+			}
+			mem_area[j] = this.oft.openFileArray[index].rwbuffer[i];
+			
+		}
 		
 		//a) The desired count or the end of the file is reached; in this
 		// case, update the current position and return status.
 		
 		//b) read the next sequential block from the disk into the buffer;
 		//continue with step 2)
-		
 		
 		return 1;
 	}
@@ -467,6 +667,14 @@ public class FileSystem {
 	// the current position in the file.
 	public int write(int index, byte[] mem_area, int count) {
 		System.out.println("write function called..\n");
+		
+		//local variables
+		int currPosition;
+		int counter = 0;
+		int fdIndex = this.oft.openFileArray[index].fileDescriptorIndex;
+		int currBlock;
+		int newBlock;
+		int maxFileLength = this.b*3;
 		
 		//transfer data specified in mem_area to index in OFT 
 		// until
@@ -479,8 +687,42 @@ public class FileSystem {
 		// and the writing continues at the beggining of the buffer.
 		// If file length expands past the last allocated block,
 		// a new block must be allocated;
-		return 1;
+		currPosition = this.oft.openFileArray[index].position;
+		currBlock = getAppropriateBlock(fdIndex, currPosition/this.b);
 		
+		for(int i = currPosition%this.b;
+				counter < count || currPosition < maxFileLength
+				;counter++, currPosition++, i++
+					) {
+			if(currPosition/this.b >= 1) { //we went through a block already, need to allocate new block
+				//buffer is written to disk
+				
+				if(counter > availableSpaceInBlock(currBlock)) {
+					//update file descriptor 
+					if((newBlock = allocateNewBlock(fdIndex)) == -1) {
+						//we cant allocate anymore new blocks
+						System.out.println("Error, cannot allocate anymore new blocks, as requested.");
+						return -1;
+					}
+					else {
+						//we can allocate new blocks!
+						
+					}
+					
+					//update bitmap
+				}
+				else {
+					//just write new block... things continue as normal
+					
+				}
+				
+				
+				//writing continues at the beginning of the buffer
+			}
+			
+		}
+		
+		return 1;
 	}
 	
 	
@@ -496,7 +738,16 @@ public class FileSystem {
 	 */	
 	public int lseek(int index, int pos) {
 		System.out.println("lseek function called..\n");
-		return -1;
+		
+		// If the new position is not within the current data block,
+		//	- write the buffer into the appropiate block on disk
+		//	- read the new data block from disk onto the buffer
+		
+		// Set current position to new position
+		
+		// return status
+		
+		return 1;
 	}
 	
 	// list the names of all files and their lengths

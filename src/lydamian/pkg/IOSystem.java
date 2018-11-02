@@ -20,6 +20,13 @@ public class IOSystem {
 				this.ldisk[i][j] = -1; // -1 means an empty area.
 			}
 		}
+		for(int i = 0; i < this.b/8; i++) {
+			this.ldisk[0][i] = 0;
+		}
+		
+		//initialize the bitmap
+		// - set the first 8 bytes or 2 ints as 1 becuase the fd plus bitmap is in use.
+		this.ldisk[0][0] = (byte) (this.ldisk[0][0] | (byte) 254);
 		
 	}
 	

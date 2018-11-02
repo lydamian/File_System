@@ -33,6 +33,7 @@ public class Driver {
 		int b = 64; //64 bytes per block;
 		int bitmapLength = 8; //64 bytes reserved for bitmap but only 8 bytes needed.
 		int k; // reserved memory location.
+		boolean bVal = true;
 		
 		
 		//Initialize Ldisk
@@ -63,7 +64,12 @@ public class Driver {
 		//Test Directory
 		
 		//Implement Shell.
-
+		while(bVal) {
+			//get a command
+			
+			//decide what to do with command, check validity
+			
+		}
 		
 		
 
