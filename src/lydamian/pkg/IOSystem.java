@@ -85,11 +85,13 @@ public class IOSystem {
 		return char_copied;
 	}
 	
-	public int saveLDisk() {
+	public int saveLDisk(String textFile) {
 		return 1;
 	}
 	
-	public int restoreLDisk() {
+	//if file exists return 1
+	//else if file doesnt exists return 0
+	public int restoreLDisk(String textFile) {
 		return 1;
 	}
 	
@@ -97,7 +99,7 @@ public class IOSystem {
 	//Input: (int) i - row of data located at ldisk
 	public void displayData(int i) {
 		for(int index = 0; index < b; index++) {
-			System.out.println(this.ldisk[i][index]); 
+			System.out.print((byte)this.ldisk[i][index]); 
 		}
 	}
 	
