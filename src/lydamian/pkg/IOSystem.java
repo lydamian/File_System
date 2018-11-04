@@ -1,4 +1,5 @@
 package lydamian.pkg;
+import java.io.*;
 
 public class IOSystem {
 	//Data Members
@@ -85,13 +86,64 @@ public class IOSystem {
 		return char_copied;
 	}
 	
+	//basically write all the contents of the block onto a textfile.
 	public int saveLDisk(String textFile) {
+		//file read/write init
+		FileOutputStream out = null;
+		
+		try {
+			out = new FileOutputStream(textFile);
+			for(int i = 0; i < this.b; i++) {
+				for(int j = 0; j < this.b; j++)
+					try {
+						out.write(ldisk[i][j]);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						return -1;
+					}
+			}
+			
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return -1;
+		}
+		try {
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return 1;
 	}
 	
-	//if file exists return 1
-	//else if file doesnt exists return 0
-	public int restoreLDisk(String textFile) {
+	// a new empty ldisk is created if no saved file is given
+	// if a textFile is given then you need to restore ldisk with its content.
+	public int restoreLDisk(String textFile) throws IOException {
+		//write all of the contents of textfile into ldisk blocks
+		//initialize IO objects
+		InputStream f = null;
+		try {
+			f = new FileInputStream(textFile);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return -1;
+		}
+		
+		for(int i = 0; i < this.b; i++) {
+			for(int j = 0; j < this.b; j++) {
+				ldisk[i][j] = (byte)f.read();
+			}
+		}
+		
+		try {
+			f.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return 1;
 	}
 	

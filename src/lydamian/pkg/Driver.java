@@ -1,6 +1,8 @@
  package lydamian.pkg;
 
 import lydamian.pkg.*;
+
+import java.io.IOException;
 import java.util.Scanner;
 
 public class Driver {
@@ -9,10 +11,12 @@ public class Driver {
 	  return str.matches("-?\\d+(\\.\\d+)?");  //match a number with optional '-' and decimal.
 	}
 	
-	public static void shell(FileSystem fileSystem, IOSystem ldisk) {
+	public static void shell() {
 		//local variables
 		boolean bVal = true;
 		Scanner in = new Scanner(System.in);
+		FileSystem fileSystem = null;
+		IOSystem ldisk = null;
 		
 		while(bVal) {
 			//get input
@@ -161,7 +165,7 @@ public class Driver {
 				int index;
 				int pos;
 				
-				if(tokenizedCommand.length < 2) {
+				if(tokenizedCommand.length < 3) {
 					System.out.println("Error, to few arguments to command sk");
 				}
 				else{
@@ -182,17 +186,26 @@ public class Driver {
 			else if(commandName.equals("in")) {
 				String textFile;
 				
-				if(tokenizedCommand.length < 2) {
-					System.out.println("Error, to few arguments supplied");
+				if(tokenizedCommand.length == 1) {
+					ldisk = new IOSystem(64,64);
+					fileSystem = new FileSystem(64, 24, 3, ldisk, 64, 64);
+					System.out.println("disk initialized");
 				}
 				else {
 					textFile = tokenizedCommand[1];
+					ldisk = new IOSystem(64,64);
+					fileSystem = new FileSystem(64, 24, 3, ldisk, 64, 64);
 					
-					if(ldisk.restoreLDisk(textFile) == 0) {
-						System.out.println("disk initialized");
-					}
-					else {
-						System.out.println("disk restored");
+					try {
+						if(ldisk.restoreLDisk(textFile) == 1) {
+							System.out.println("disk restored");
+						}
+						else {
+							System.out.println("Error restoring disk");
+						}
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
 				}
 			}
@@ -204,6 +217,8 @@ public class Driver {
 				}
 				else {
 					textFile = tokenizedCommand[1];
+					
+					fileSystem.closeOFT();
 					
 					if(ldisk.saveLDisk(textFile) == -1) {
 						System.out.println("Error, saving ldisk");
@@ -262,71 +277,7 @@ public class Driver {
 		boolean bVal = true;
 		char mem_area = 'c';
 		
-		
-		//Initialize Ldisk
-		IOSystem ldisk = new IOSystem(64,64);
-		//ldisk.testIOSystem();
-		
-		//Initializing FileSystem.java
-		FileSystem fileSystem = new FileSystem(64, 24, 3, ldisk, l, b);
-		
-		//System.out.println("------");
-		
-		//ldisk.displayData(1);
-		
-		//System.out.println("------");
-		
-		//Test create/destroy
-		//fileSystem.create("foo1");
-		//fileSystem.create("fo2");
-		//fileSystem.create("f3");
-		
-		//System.out.println("-----");
-		//ldisk.displayData(7);
-		//ldisk.displayData(1);
-		
-		//fileSystem.destroy("f3");
-		//fileSystem.destroy("fo2");
-		
-		//ldisk.displayData(7);
-		//System.out.println("----");
-		//ldisk.displayData(1);
-		
-		//Test OFT
-		//int oftIndex = fileSystem.open("foo1");
-		//fileSystem.close(oftIndex);
-		//System.out.println("--------_____");
-		//ldisk.displayData(1);
-		
-		//oftIndex = fileSystem.open("foo1");
-		//System.out.println("oftIndex is:  " + oftIndex);
-		//fileSystem.write(oftIndex, mem_area, 66);
-		//fileSystem.oft.displayOFT();
-		//fileSystem.close(oftIndex);
-		
-		//System.out.println("WHAT>>>>>>>");
-		//ldisk.displayData(10);
-		//System.out.println(" asdfasdf ");
-		//ldisk.displayData(11);
-		//System.out.println(" asdfasdf ");
-		//ldisk.displayData(12);
-		
-		//Test Reading Writing Seeking
-		//fileSystem.write(oftIndex, mem_area, 5);
-		//fileSystem.close(oftIndex);
-
-		//ldisk.displayData(11);
-
-		//System.out.println("---------");
-		
-		//ldisk.displayData(12);
-		
-		//System.out.println("---------");
-		
-		
-		//Test Directory
-		
-		shell(fileSystem, ldisk);
+		shell();
 	}
 
 }

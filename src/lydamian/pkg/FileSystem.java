@@ -93,6 +93,16 @@ public class FileSystem {
 	
 	//class methods
 	
+	int closeOFT() {
+		for(int i = 1; i < 4; i++) {
+			if(this.oft.openFileArray[i].fileDescriptorIndex != -1) {
+				close(i);
+			}
+		}
+		return 1;
+	}
+	
+	
 	//converts byte block to char block
 	char[] byteToChar(byte[] block) {
 		char[] charBlock = new char[this.b];
@@ -511,7 +521,7 @@ public class FileSystem {
 			j++;
 		}
 		
-		int descriptorIndex = (freeFdI*freeFdJ)/16;
+		int descriptorIndex =  (((freeFdI-1)*this.b) + freeFdJ)/16;
 		System.out.println("descriptorIndex is: " + descriptorIndex);
 		byte[] fdIndex = this.toBytes(descriptorIndex);
 		
@@ -667,7 +677,8 @@ public class FileSystem {
 		else {
 			for(int i = 1; i < 4; i++) {
 				if(this.oft.openFileArray[i].fileDescriptorIndex == -1) {
-					freeTableIndex = 1;
+					freeTableIndex = i;
+					break;
 				}
 			}
 
@@ -697,6 +708,11 @@ public class FileSystem {
 		int fdIndex = this.oft.openFileArray[index].fileDescriptorIndex;
 		int lastBlockIndex = 0;
 		int newBlock;
+		
+		//check if the close index is not even open
+		if(this.oft.openFileArray[index].fileDescriptorIndex == -1) {
+			return -1;
+		}
 		
 		//Write the buffer to disk
 		
@@ -903,6 +919,7 @@ public class FileSystem {
 					
 					i = 0;
 				}
+				this.oft.openFileArray[index].rwbuffer[i] = (byte)mem_area;
 			}
 			else {
 				this.oft.openFileArray[index].rwbuffer[i] = (byte)mem_area;
@@ -932,16 +949,23 @@ public class FileSystem {
 		int currBlock = currPosition/this.b;
 		int toPos = pos/this.b;
 		int fdIndex = this.oft.openFileArray[index].fileDescriptorIndex;
+		int toBlock;
 		
 		// If the new position is not within the current data block,
 		//	- write the buffer into the appropriate block on disk
 		//	- read the new data block from disk onto the buffer
 		
 		if(currBlock != toPos) {
-			ldiskObj.write_block(getAppropriateBlock(fdIndex, currBlock), this.oft.openFileArray[index].rwbuffer);
+			toBlock = getAppropriateBlock(fdIndex, currBlock);
+			if(toBlock == -1) {
+				int newBlock = allocateNewBlock(fdIndex);
+				setBitmap(newBlock, 1);
+				ldiskObj.write_block(newBlock, this.oft.openFileArray[index].rwbuffer);
+			}
+			
 			clearBuffer(index);
 		}
-
+		
 		ldiskObj.read_block(getAppropriateBlock(fdIndex, toPos), this.oft.openFileArray[index].rwbuffer);
 		
 		// Set current position to new position
