@@ -169,10 +169,8 @@ public class FileSystem {
 		int fdBlockIndex = fileIndex*16%this.b;
 		ldiskObj.read_block(fdBlock, tempArr);
 		
-		for(int i = fdBlockIndex; i < fdBlockIndex + 4; i = i+4) {
-			maxLength += fromByteArray(Arrays.copyOfRange(tempArr, i, i + 4));
-		}
-		
+		maxLength += fromByteArray(Arrays.copyOfRange(tempArr, fdBlockIndex, fdBlockIndex+4));
+
 		System.out.println("the maxLength is: " + maxLength);
 		return maxLength;
 	}
@@ -664,6 +662,13 @@ public class FileSystem {
 				}
 		}
 		
+		// Check if fdIndex is already in the OFT - error
+		for(int i = 0; i < 4; i++) {
+			if(fdIndex == this.oft.openFileArray[i].fileDescriptorIndex) {
+				return -1;
+			}
+		}
+		
 		if(fdIndex == -1) {
 			System.out.println("Could not find a file that matches symbolic_name");
 			return -1;
@@ -720,6 +725,9 @@ public class FileSystem {
 		int[] fdBlocks = fileIndexToBlock(fdIndex);
 		lastBlockIndex = this.oft.openFileArray[index].position/this.b;
 			
+		if(lastBlockIndex > 2) {
+			return -1;
+		}
 		int lastBlock = fdBlocks[lastBlockIndex];
 		if(lastBlock == -1) {
 			//need to allocate a new block
@@ -729,6 +737,7 @@ public class FileSystem {
 			System.out.println("This is the contents of the written block: " );
 			ldiskObj.displayData(newBlock);
 			//Update the file length in descriptor
+			setFileLength(fdIndex, getFileMaxLength(fdIndex) + this.oft.getBufferSize(index));
 		}
 		else {
 			ldiskObj.write_block(lastBlock, this.oft.openFileArray[index].rwbuffer);
@@ -736,6 +745,7 @@ public class FileSystem {
 			System.out.println("This is the contents of the written block: " );
 			ldiskObj.displayData(lastBlock);
 			//Update the file length in descriptor
+			
 		}
 		
 		//Free the OFT entry
@@ -766,6 +776,12 @@ public class FileSystem {
 		int maxFileLength = 64*3;
 		int j = 0;
 		int curr_file_index = this.oft.openFileArray[index].position/this.b;
+		
+		//Check if the corresponding index is not even open
+		int indexCorrespondingFileIndex = this.oft.openFileArray[index].fileDescriptorIndex;
+		if (indexCorrespondingFileIndex == -1) {
+			return -1;
+		}
 		
 		//compute the position within the read/write buffer that
 		// corresponds to the current position within the file (i.e file length
@@ -855,6 +871,10 @@ public class FileSystem {
 		}
 		
 		this.oft.openFileArray[index].position = currPosition;
+		System.out.println("in write function: " );
+		System.out.println("getFileMaxLength is: " + getFileMaxLength(fdIndex));
+		setFileLength(fdIndex, getFileMaxLength(fdIndex) + counter);
+		System.out.println("new maxlength is: " + getFileMaxLength(fdIndex));
 		return counter;
 	}
 	
@@ -951,6 +971,13 @@ public class FileSystem {
 		int fdIndex = this.oft.openFileArray[index].fileDescriptorIndex;
 		int toBlock;
 		
+		// check exception that pos to seek is greater than file length of index
+		//if(pos > getFileMaxLength(fdIndex)) {
+		//	System.out.println("exception occured in lseek where pos to seek is greater than file length");
+		//	return -1;
+		//}
+		
+		
 		// If the new position is not within the current data block,
 		//	- write the buffer into the appropriate block on disk
 		//	- read the new data block from disk onto the buffer
@@ -976,7 +1003,7 @@ public class FileSystem {
 	}
 	
 	// list the names of all files and their lengths
-	public int directory() {
+	public String directory() {
 		System.out.println("directory method called.\n");
 		//local variables
 		byte[] dir = new byte[this.b];
@@ -984,12 +1011,14 @@ public class FileSystem {
 		String name;
 		int fileLength;
 		int m = 0;
-		
+		StringBuffer sBuffer = new StringBuffer();
+
 		//Read the directory file
 		
 		//For each entry, 
 		// - find file descriptor
 		// - print file name and file length
+		
 		for(int i = 7; i < 10; i++) {
 			ldiskObj.read_block(i, dir);
 			for(int j = 0; j < this.b; j=j+8) {
@@ -1001,17 +1030,14 @@ public class FileSystem {
 						m++;
 					}
 					name = new String(temp);
-					System.out.print(name);
+					sBuffer.append(name + " ");
 							
-					//get file length
-					fileLength = fromByteArray(Arrays.copyOfRange(dir, j+4, j+8));
-					System.out.println(" - " + fileLength);
 				}
 				
 			}
 		}
 		
-		return -1;
+		return sBuffer.toString();
 	}
 	
 	//Inner Class
@@ -1043,10 +1069,21 @@ public class FileSystem {
 			}
 		}
 		
+		int getBufferSize(int index) {
+			for(int i = 0; i < 64; i++) {
+				if(this.openFileArray[index].rwbuffer[i] == 0) {
+					System.out.println("the buffer size of index " + index + " is " + i);
+					return i;
+				}
+			}
+			return 0;
+		}
+		
 		public class OpenFile{
 			byte[] rwbuffer;
 			int position;
 			int fileDescriptorIndex;
+			int fileLength;
 			
 			OpenFile(){
 				this.rwbuffer = new byte[64];
